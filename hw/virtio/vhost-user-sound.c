@@ -15,6 +15,7 @@
 #include "hw/qdev-properties.h"
 #include "hw/qdev-properties-system.h"
 #include "hw/virtio/vhost-user-sound.h"
+#include "standard-headers/linux/virtio_ids.h"
 
 static Property vus_properties[] = {
     DEFINE_PROP_CHR("chardev", VHostUserSound, conf.chardev),
@@ -26,49 +27,55 @@ static const VMStateDescription vus_vmstate = {
     .unmigratable = 1,
 };
 
+static void vus_snd_handle_output(VirtIODevice *vdev, VirtQueue *vq)
+{
+    /*
+     * Not normally called; it's the daemon that handles the queue;
+     * however virtio's cleanup path can call this.
+     */
+}
+
 static void vus_device_realize(DeviceState *dev, Error **errp)
 {
-    error_report("holaaaa");
-    /*
-    VHostVSockCommon *vvc = VHOST_VSOCK_COMMON(dev);
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
-    VHostUserVSock *vsock = VHOST_USER_VSOCK(dev);
+    VHostUserSound *snd = VHOST_USER_SOUND(dev);
     int ret;
 
-    if (!vsock->conf.chardev.chr) {
+    if (!snd->conf.chardev.chr) {
         error_setg(errp, "missing chardev");
         return;
     }
-
-    if (!vhost_user_init(&vsock->vhost_user, &vsock->conf.chardev, errp)) {
+    if (!vhost_user_init(&snd->vhost_user, &snd->conf.chardev, errp)) {
         return;
     }
 
-    vhost_vsock_common_realize(vdev);
+    virtio_init(vdev, VIRTIO_ID_SOUND, sizeof(snd->config));
 
-    vhost_dev_set_config_notifier(&vvc->vhost_dev, &vsock_ops);
-
-    ret = vhost_dev_init(&vvc->vhost_dev, &vsock->vhost_user,
+    /* add queues */
+    snd->ctrl_vq = virtio_add_queue(vdev, 64, vus_snd_handle_output);
+    snd->event_vq = virtio_add_queue(vdev, 64, vus_snd_handle_output);
+    snd->tx_vq = virtio_add_queue(vdev, 64, vus_snd_handle_output);
+    snd->rx_vq = virtio_add_queue(vdev, 64, vus_snd_handle_output);
+    snd->vhost_dev.nvqs = 4;
+    snd->vhost_dev.vqs = g_new0(struct vhost_virtqueue, snd->vhost_dev.nvqs);
+    ret = vhost_dev_init(&snd->vhost_dev, &snd->vhost_user,
                          VHOST_BACKEND_TYPE_USER, 0, errp);
     if (ret < 0) {
-        goto err_virtio;
-    }
-
-    ret = vhost_dev_get_config(&vvc->vhost_dev, (uint8_t *)&vsock->vsockcfg,
-                               sizeof(struct virtio_vsock_config), errp);
-    if (ret < 0) {
-        goto err_vhost_dev;
+        error_setg_errno(errp, -ret, "vhost_dev_init() failed");
+        goto vhost_dev_init_failed;
     }
 
     return;
 
-err_vhost_dev:
-    vhost_dev_cleanup(&vvc->vhost_dev);
-err_virtio:
-    vhost_vsock_common_unrealize(vdev);
-    vhost_user_cleanup(&vsock->vhost_user);
-    return;
-    */
+vhost_dev_init_failed:
+    vhost_user_cleanup(&snd->vhost_user);
+    virtio_delete_queue(snd->ctrl_vq);
+    virtio_delete_queue(snd->event_vq);
+    virtio_delete_queue(snd->tx_vq);
+    virtio_delete_queue(snd->rx_vq);
+    virtio_cleanup(vdev);
+    g_free(snd->vhost_dev.vqs);
+    snd->vhost_dev.vqs = NULL;
 }
 
 static void vus_class_init(ObjectClass *klass, void *data)
