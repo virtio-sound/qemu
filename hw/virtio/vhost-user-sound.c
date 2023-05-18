@@ -148,6 +148,28 @@ static void vus_snd_handle_output(VirtIODevice *vdev, VirtQueue *vq)
      */
 }
 
+static int
+vus_sound_config_change(struct vhost_dev *dev)
+{
+    VHostUserSound *snd = VHOST_USER_SOUND(dev->vdev);
+    Error *local_err = NULL;
+    int ret = vhost_dev_get_config(dev, (uint8_t *)&snd->config,
+                                   sizeof(struct virtio_snd_config),
+                                   &local_err);
+    if (ret < 0) {
+        error_report_err(local_err);
+        return -1;
+    }
+
+    virtio_notify_config(dev->vdev);
+
+    return 0;
+}
+
+static const VhostDevConfigOps config_ops = {
+    .vhost_dev_config_notifier = vus_sound_config_change,
+};
+
 static void vus_device_realize(DeviceState *dev, Error **errp)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
@@ -161,6 +183,7 @@ static void vus_device_realize(DeviceState *dev, Error **errp)
     if (!vhost_user_init(&snd->vhost_user, &snd->conf.chardev, errp)) {
         return;
     }
+    vhost_dev_set_config_notifier(&snd->vhost_dev, &config_ops);
 
     virtio_init(vdev, VIRTIO_ID_SOUND, sizeof(snd->config));
 
@@ -171,6 +194,8 @@ static void vus_device_realize(DeviceState *dev, Error **errp)
     snd->rx_vq = virtio_add_queue(vdev, 64, vus_snd_handle_output);
     snd->vhost_dev.nvqs = 4;
     snd->vhost_dev.vqs = g_new0(struct vhost_virtqueue, snd->vhost_dev.nvqs);
+    snd->vhost_user.supports_config = true;
+
     ret = vhost_dev_init(&snd->vhost_dev, &snd->vhost_user,
                          VHOST_BACKEND_TYPE_USER, 0, errp);
     if (ret < 0) {

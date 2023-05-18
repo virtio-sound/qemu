@@ -25,7 +25,6 @@ typedef struct {
 
 struct VHostUserSound {
     /*< private >*/
-    // Shoud I use common like in vsock? What is the difference?
     VirtIODevice parent;
     VhostUserState vhost_user;
     VHostUserSoundConf conf;
