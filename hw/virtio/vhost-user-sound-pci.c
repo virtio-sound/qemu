@@ -30,7 +30,7 @@ struct VHostUserSoundPCI {
 };
 
 static Property vhost_user_sound_pci_properties[] = {
-    DEFINE_PROP_UINT32("vectors", VirtIOPCIProxy, nvectors, 3),
+    DEFINE_PROP_UINT32("vectors", VirtIOPCIProxy, nvectors, 4),
     DEFINE_PROP_END_OF_LIST(),
 };
 
