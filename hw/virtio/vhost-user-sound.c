@@ -238,6 +238,12 @@ static void vus_device_realize(DeviceState *dev, Error **errp)
         goto vhost_dev_init_failed;
     }
 
+    ret = vhost_dev_get_config(&snd->vhost_dev, (uint8_t *)&snd->config,
+                               sizeof(struct virtio_snd_config), errp);
+    if (ret < 0) {
+        goto vhost_dev_init_failed;
+    }
+
     return;
 
 vhost_dev_init_failed:
