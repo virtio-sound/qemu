@@ -66,6 +66,11 @@ config VHOST_USER_VSOCK
     default y
     depends on VIRTIO && VHOST_USER
 
+config VHOST_USER_SOUND
+    bool
+    default y
+    depends on VIRTIO && VHOST_USER
+
 config VHOST_USER_I2C
     bool
     default y
