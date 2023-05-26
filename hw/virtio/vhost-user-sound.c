@@ -149,6 +149,40 @@ static void vus_snd_handle_output(VirtIODevice *vdev, VirtQueue *vq)
      */
 }
 
+static void vhost_sound_guest_notifier_mask(VirtIODevice *vdev, int idx,
+                                            bool mask)
+{
+    VHostUserSound *snd = VHOST_USER_SOUND(vdev);
+
+    /*
+     * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+     * as the Marco of configure interrupt's IDX, If this driver does not
+     * support, the function will return
+     */
+
+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+        return;
+    }
+    vhost_virtqueue_mask(&snd->vhost_dev, vdev, idx, mask);
+}
+
+static bool vhost_sound_guest_notifier_pending(VirtIODevice *vdev,
+                                               int idx)
+{
+    VHostUserSound *snd = VHOST_USER_SOUND(vdev);
+
+    /*
+     * Add the check for configure interrupt, Use VIRTIO_CONFIG_IRQ_IDX -1
+     * as the Marco of configure interrupt's IDX, If this driver does not
+     * support, the function will return
+     */
+
+    if (idx == VIRTIO_CONFIG_IRQ_IDX) {
+        return false;
+    }
+    return vhost_virtqueue_pending(&snd->vhost_dev, idx);
+}
+
 static int
 vus_sound_config_change(struct vhost_dev *dev)
 {
@@ -239,6 +273,12 @@ static void vus_device_unrealize(DeviceState *dev)
     snd->vhost_dev.vqs = NULL;
 }
 
+static struct vhost_dev *vus_get_vhost(VirtIODevice *vdev)
+{
+    VHostUserSound *snd = VHOST_USER_SOUND(vdev);
+    return &snd->vhost_dev;
+}
+
 static void vus_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -251,6 +291,9 @@ static void vus_class_init(ObjectClass *klass, void *data)
     vdc->get_features = vus_get_features;
     vdc->get_config = vus_get_config;
     vdc->set_status = vus_set_status;
+    vdc->guest_notifier_mask = vhost_sound_guest_notifier_mask;
+    vdc->guest_notifier_pending = vhost_sound_guest_notifier_pending;
+    vdc->get_vhost = vus_get_vhost;
 }
 
 static const TypeInfo vus_info = {
